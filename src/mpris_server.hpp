@@ -15,16 +15,18 @@ namespace mpris {
 using namespace std::literals::string_literals;
 
 using StringList = std::vector<std::string>;
+using Metadata   = std::map<std::string, sdbus::Variant>;
 
-static const auto PREFIX       = "org.mpris.MediaPlayer2."s;
-static const auto OBJECT_PATH  = "/org/mpris/MediaPlayer2"s;
-static const auto MP2          = "org.mpris.MediaPlayer2"s;
-static const auto MP2PLAYER    = "org.mpris.MediaPlayer2.Player"s;
+static const auto PREFIX      = "org.mpris.MediaPlayer2."s;
+static const auto OBJECT_PATH = "/org/mpris/MediaPlayer2"s;
+static const auto MP2         = "org.mpris.MediaPlayer2"s;
+static const auto MP2P        = "org.mpris.MediaPlayer2.Player"s;
+static const auto PROPS       = "org.freedesktop.DBus.Properties"s;
 
 enum class PlaybackStatus { Playing, Paused, Stopped };
 enum class LoopStatus     { None, Track, Playlist };
 
-enum class MetadataEntry {
+enum class Field {
     TrackId     , Length     , ArtUrl      , Album          ,
     AlbumArtist , Artist     , AsText      , AudioBPM       ,
     AutoRating  , Comment    , Composer    , ContentCreated ,
@@ -61,58 +63,47 @@ std::string loop_status_to_string(        LoopStatus status) { return     loop_s
 
 } // namespace detail
 
-std::string metadata_entry_to_string(MetadataEntry entry) { return metadata_strings[static_cast<int>( entry)]; }
+std::string metadata_entry_to_string(Field entry) { return metadata_strings[static_cast<int>( entry)]; }
 
 class Server {
     std::string name;
     std::unique_ptr<sdbus::IConnection> connection;
     std::unique_ptr<sdbus::IObject> object;
 
-    void prop_changed(const std::string &prop);
+    std::function<void(void)>                       quit_fn;
+    std::function<void(void)>                       raise_fn;
+    std::function<void(void)>                       next_fn;
+    std::function<void(void)>                       previous_fn;
+    std::function<void(void)>                       pause_fn;
+    std::function<void(void)>                       play_pause_fn;
+    std::function<void(void)>                       stop_fn;
+    std::function<void(void)>                       play_fn;
+    std::function<void(int64_t)>                    seek_fn;
+    std::function<void(sdbus::ObjectPath, int64_t)> set_position_fn;
+    std::function<void(std::string)>                open_uri_fn;
+    std::function<void(bool)>                       fullscreen_changed_fn;
+    std::function<void(LoopStatus)>                 loop_status_changed_fn;
+    std::function<void(double)>                     rate_changed_fn;
+    std::function<void(bool)>                       shuffle_changed_fn;
+    std::function<void(double)>                     volume_changed_fn;
 
-#define CALLBACK(name, ...)                         \
-private:                                            \
-    std::function<void(__VA_ARGS__)> name##_fn;     \
-                                                    \
-public:                                             \
-    void on_##name(auto &&fn) { name##_fn = fn; }   \
-
-    CALLBACK(quit,          void)
-    CALLBACK(raise,         void)
-    CALLBACK(next,          void)
-    CALLBACK(previous,      void)
-    CALLBACK(pause,         void)
-    CALLBACK(play_pause,    void)
-    CALLBACK(stop,          void)
-    CALLBACK(play,          void)
-    CALLBACK(seek,          int64_t)
-    CALLBACK(set_position,  sdbus::ObjectPath, int64_t)
-    CALLBACK(open_uri,      std::string)
-
-    CALLBACK(fullscreen_changed,    bool)
-    CALLBACK(loop_status_changed,   LoopStatus)
-    CALLBACK(rate_changed,          double)
-    CALLBACK(shuffle_changed,       bool)
-    CALLBACK(volume_changed,        double)
-
-#undef CALLBACK
-
-private:
     bool fullscreen                  = false;
     std::string identity             = "";
     std::string desktop_entry        = "";
     StringList supported_uri_schemes = {};
     StringList supported_mime_types  = {};
+    PlaybackStatus playback_status   = PlaybackStatus::Stopped;
+    LoopStatus loop_status           = LoopStatus::None;
+    double rate                      = 0.0;
+    bool shuffle                     = false;
+    Metadata metadata                = {};
+    double volume                    = 0.0;
+    int64_t position                 = 0;
+    double maximum_rate              = 0.0;
+    double minimum_rate              = 0.0;
 
-    PlaybackStatus playback_status                 = PlaybackStatus::Stopped;
-    LoopStatus loop_status                         = LoopStatus::None;
-    double rate                                    = 0.0;
-    bool shuffle                                   = false;
-    std::map<std::string, sdbus::Variant> metadata = {};
-    double volume                                  = 0.0;
-    int64_t position                               = 0;
-    double maximum_rate                            = 0.0;
-    double minimum_rate                            = 0.0;
+    void prop_changed(const std::string &interface, const std::string &name, sdbus::Variant value);
+    void control_props_changed();
 
     bool can_control()     const { return bool(loop_status_changed_fn) && bool(shuffle_changed_fn)
                                        && bool(volume_changed_fn)      && bool(stop_fn);                }
@@ -135,30 +126,64 @@ public:
     void start_loop();
     void start_loop_async();
 
-    void set_fullscreen(bool value)                         { fullscreen            = value; prop_changed("Fullscreen"); }
-    void set_identity(const std::string &value)             { identity              = value; prop_changed("Identity"); }
-    void set_desktop_entry(const std::string &value)        { desktop_entry         = value; prop_changed("DesktopEntry"); }
-    void set_supported_uri_schemes(const StringList &value) { supported_uri_schemes = value; prop_changed("Fullscreen"); }
-    void set_supported_mime_types(const StringList &value)  { supported_mime_types  = value; prop_changed("Fullscreen"); }
+    void on_quit                ( auto &&fn) { quit_fn                = fn; prop_changed(MP2, "CanQuit", true);          }
+    void on_raise               ( auto &&fn) { raise_fn               = fn; prop_changed(MP2, "CanQuit", true);          }
+    void on_next                ( auto &&fn) { next_fn                = fn; control_props_changed();                     }
+    void on_previous            ( auto &&fn) { previous_fn            = fn; control_props_changed();                     }
+    void on_pause               ( auto &&fn) { pause_fn               = fn; control_props_changed();                     }
+    void on_play_pause          ( auto &&fn) { play_pause_fn          = fn; control_props_changed();                     }
+    void on_stop                ( auto &&fn) { stop_fn                = fn; control_props_changed();                     }
+    void on_play                ( auto &&fn) { play_fn                = fn; control_props_changed();                     }
+    void on_seek                ( auto &&fn) { seek_fn                = fn; control_props_changed();                     }
+    void on_set_position        ( auto &&fn) { set_position_fn        = fn;                                              }
+    void on_open_uri            ( auto &&fn) { open_uri_fn            = fn;                                              }
+    void on_fullscreen_changed  ( auto &&fn) { fullscreen_changed_fn  = fn; prop_changed(MP2, "CanSetFullscreen", true); }
+    void on_loop_status_changed ( auto &&fn) { loop_status_changed_fn = fn; control_props_changed();                     }
+    void on_rate_changed        ( auto &&fn) { rate_changed_fn        = fn;                                              }
+    void on_shuffle_changed     ( auto &&fn) { shuffle_changed_fn     = fn; control_props_changed();                     }
+    void on_volume_changed      ( auto &&fn) { volume_changed_fn      = fn; control_props_changed();                     }
 
-    void set_playback_status(PlaybackStatus value)          { playback_status       = value; prop_changed("Fullscreen"); }
-    void set_loop_status(LoopStatus value)                  { loop_status           = value; prop_changed("Fullscreen"); }
-    void set_rate(double value)                             { rate                  = value; prop_changed("Fullscreen"); }
-    void set_shuffle(bool value)                            { shuffle               = value; prop_changed("Fullscreen"); }
-    void set_metadata(const std::map<MetadataEntry, sdbus::Variant> &value)
+    void set_fullscreen(bool value)                         { fullscreen            = value; prop_changed(MP2,  "Fullscreen"          , fullscreen); }
+    void set_identity(const std::string &value)             { identity              = value; prop_changed(MP2,  "Identity"            , identity); }
+    void set_desktop_entry(const std::string &value)        { desktop_entry         = value; prop_changed(MP2,  "DesktopEntry"        , desktop_entry); }
+    void set_supported_uri_schemes(const StringList &value) { supported_uri_schemes = value; prop_changed(MP2,  "SupportedUriSchemes" , supported_uri_schemes ); }
+    void set_supported_mime_types(const StringList &value)  { supported_mime_types  = value; prop_changed(MP2,  "SupportedMimeTypes"  , supported_mime_types); }
+    void set_playback_status(PlaybackStatus value)          { playback_status       = value; prop_changed(MP2P, "PlaybackStatus"      , detail::playback_status_to_string(playback_status)); }
+    void set_loop_status(LoopStatus value)                  { loop_status           = value; prop_changed(MP2P, "LoopStatus"          , detail::loop_status_to_string(loop_status)); }
+    void set_rate(double value)                             { rate                  = value; prop_changed(MP2P, "Rate"                , rate); }
+    void set_shuffle(bool value)                            { shuffle               = value; prop_changed(MP2P, "Shuffle"             , shuffle); }
+    void set_volume(double value)                           { volume                = value; prop_changed(MP2P, "Volume"              , volume); }
+    void set_position(int64_t value)                        { position              = value; }
+    void set_minimum_rate(double value)                     { minimum_rate          = value; prop_changed(MP2P, "MinimumRate"         , minimum_rate); }
+    void set_maximum_rate(double value)                     { maximum_rate          = value; prop_changed(MP2P, "MaximumRate"         , maximum_rate); }
+    void set_metadata(const std::map<Field, sdbus::Variant> &value)
     {
         metadata.clear();
         for (auto [k, v] : value)
             metadata[metadata_entry_to_string(k)] = v;
-        prop_changed("Fullscreen");
+        prop_changed(MP2P, "Metadata", metadata);
     }
-    void set_volume(double value)                           { volume                = value; prop_changed("Fullscreen"); }
-    void set_position(int64_t value)                        { position              = value; prop_changed("Fullscreen"); }
-    void set_maximum_rate(double value)                     { maximum_rate          = value; prop_changed("Fullscreen"); }
-    void set_minimum_rate(double value)                     { minimum_rate          = value; prop_changed("Fullscreen"); }
 
     void send_seeked_signal(int64_t position);
 };
+
+void Server::prop_changed(const std::string &interface, const std::string &name, sdbus::Variant value)
+{
+    std::map<std::string, sdbus::Variant> d;
+    d[name] = value;
+    object->emitSignal("PropertiesChanged").onInterface("org.freedesktop.DBus.Properties").withArguments(MP2, d, std::vector<std::string>{});
+}
+
+void Server::control_props_changed()
+{
+    std::map<std::string, sdbus::Variant> d;
+    if (can_go_next())     d["CanGoNext"]     = true;
+    if (can_go_previous()) d["CanGoPrevious"] = true;
+    if (can_play())        d["CanPlay"]       = true;
+    if (can_pause())       d["CanPause"]      = true;
+    if (can_seek())        d["CanSeek"]       = true;
+    object->emitSignal("PropertiesChanged").onInterface("org.freedesktop.DBus.Properties").withArguments(MP2, d, std::vector<std::string>{});
+}
 
 Server Server::make(const std::string &name)
 {
@@ -173,21 +198,22 @@ Server::Server(const std::string &player_name)
     connection->requestName(PREFIX + player_name);
     object = sdbus::createObject(*connection, OBJECT_PATH);
 
-    object->registerMethod("Raise")      .onInterface(MP2)      .implementedAs([&] { if (raise_fn)                  raise_fn();      });
-    object->registerMethod("Quit")       .onInterface(MP2)      .implementedAs([&] { if (quit_fn)                   quit_fn();       });
-    object->registerMethod("Next")       .onInterface(MP2PLAYER).implementedAs([&] { if (can_go_next())             next_fn();       });
-    object->registerMethod("Previous")   .onInterface(MP2PLAYER).implementedAs([&] { if (can_go_previous())         previous_fn();   });
-    object->registerMethod("Pause")      .onInterface(MP2PLAYER).implementedAs([&] { if (can_pause())               pause_fn();      });
-    object->registerMethod("PlayPause")  .onInterface(MP2PLAYER).implementedAs([&] { if (can_play() || can_pause()) play_pause_fn(); });
-    object->registerMethod("Stop")       .onInterface(MP2PLAYER).implementedAs([&] { if (can_control())             stop_fn();       });
-    object->registerMethod("Play")       .onInterface(MP2PLAYER).implementedAs([&] { if (can_play())                play_fn();       });
-    object->registerMethod("Seek")       .onInterface(MP2PLAYER).implementedAs([&] (int64_t n)                         { if (can_seek()) seek_fn(n); })              .withInputParamNames("Offset");
-    object->registerMethod("SetPosition").onInterface(MP2PLAYER).implementedAs([&] (sdbus::ObjectPath id, int64_t pos) { if (can_seek()) set_position_fn(id, pos); }).withInputParamNames("TrackId", "Position");
-    object->registerMethod("OpenUri")    .onInterface(MP2PLAYER).implementedAs([&] (std::string uri) { if (open_uri_fn) open_uri_fn(uri); }).withInputParamNames("Uri");
+    object->registerMethod("Raise")      .onInterface(MP2) .implementedAs([&] { if (raise_fn)                  raise_fn();      });
+    object->registerMethod("Quit")       .onInterface(MP2) .implementedAs([&] { if (quit_fn)                   quit_fn();       });
+    object->registerMethod("Next")       .onInterface(MP2P).implementedAs([&] { if (can_go_next())             next_fn();       });
+    object->registerMethod("Previous")   .onInterface(MP2P).implementedAs([&] { if (can_go_previous())         previous_fn();   });
+    object->registerMethod("Pause")      .onInterface(MP2P).implementedAs([&] { if (can_pause())               pause_fn();      });
+    object->registerMethod("PlayPause")  .onInterface(MP2P).implementedAs([&] { if (can_play() || can_pause()) play_pause_fn(); });
+    object->registerMethod("Stop")       .onInterface(MP2P).implementedAs([&] { if (can_control())             stop_fn();       });
+    object->registerMethod("Play")       .onInterface(MP2P).implementedAs([&] { if (can_play())                play_fn();       });
+    object->registerMethod("Seek")       .onInterface(MP2P).implementedAs([&] (int64_t n)                         { if (can_seek()) seek_fn(n); })              .withInputParamNames("Offset");
+    object->registerMethod("SetPosition").onInterface(MP2P).implementedAs([&] (sdbus::ObjectPath id, int64_t pos) { if (can_seek()) set_position_fn(id, pos); }).withInputParamNames("TrackId", "Position");
+    object->registerMethod("OpenUri")    .onInterface(MP2P).implementedAs([&] (std::string uri)                   { if (open_uri_fn) open_uri_fn(uri); })       .withInputParamNames("Uri");
 
 #define M(f) detail::member_fn(this, &Server::f)
     object->registerProperty("CanQuit")             .onInterface(MP2).withGetter([&] { return bool(quit_fn); });
-    object->registerProperty("Fullscreen")          .onInterface(MP2).withGetter([&] { return fullscreen; }).withSetter(M(set_fullscreen_external));
+    object->registerProperty("Fullscreen")          .onInterface(MP2).withGetter([&] { return fullscreen; })
+                                                                     .withSetter(M(set_fullscreen_external));
     object->registerProperty("CanSetFullscreen")    .onInterface(MP2).withGetter([&] { return bool(fullscreen_changed_fn); });
     object->registerProperty("CanRaise")            .onInterface(MP2).withGetter([&] { return bool(raise_fn); });
     object->registerProperty("HasTrackList")        .onInterface(MP2).withGetter([&] { return false; });
@@ -196,28 +222,28 @@ Server::Server(const std::string &player_name)
     object->registerProperty("SupportedUriSchemes") .onInterface(MP2).withGetter([&] { return supported_uri_schemes; });
     object->registerProperty("SupportedMimeTypes")  .onInterface(MP2).withGetter([&] { return supported_mime_types; });
 
-    object->registerProperty("PlaybackStatus").onInterface(MP2PLAYER).withGetter([&] { return detail::playback_status_to_string(playback_status); });
-    object->registerProperty("LoopStatus")    .onInterface(MP2PLAYER).withGetter([&] { return detail::loop_status_to_string(loop_status); })
-                                                                     .withSetter(M(set_loop_status_external));
-    object->registerProperty("Rate")          .onInterface(MP2PLAYER).withGetter([&] { return rate; })
-                                                                     .withSetter(M(set_rate_external));
-    object->registerProperty("Shuffle")       .onInterface(MP2PLAYER).withGetter([&] { return shuffle; })
-                                                                     .withSetter(M(set_shuffle_external));
-    object->registerProperty("Metadata")      .onInterface(MP2PLAYER).withGetter([&] { return metadata; });
-    object->registerProperty("Volume")        .onInterface(MP2PLAYER).withGetter([&] { return volume; })
-                                                                     .withSetter(M(set_volume_external));
-    object->registerProperty("Position")      .onInterface(MP2PLAYER).withGetter([&] { return position; });
-    object->registerProperty("MinimumRate")   .onInterface(MP2PLAYER).withGetter([&] { return minimum_rate; });
-    object->registerProperty("MaximumRate")   .onInterface(MP2PLAYER).withGetter([&] { return maximum_rate; });
-    object->registerProperty("CanGoNext")     .onInterface(MP2PLAYER).withGetter(M(can_go_next));
-    object->registerProperty("CanGoPrevious") .onInterface(MP2PLAYER).withGetter(M(can_go_previous));
-    object->registerProperty("CanPlay")       .onInterface(MP2PLAYER).withGetter(M(can_play));
-    object->registerProperty("CanPause")      .onInterface(MP2PLAYER).withGetter(M(can_pause));
-    object->registerProperty("CanSeek")       .onInterface(MP2PLAYER).withGetter(M(can_seek));
-    object->registerProperty("CanControl")    .onInterface(MP2PLAYER).withGetter(M(can_control));
+    object->registerProperty("PlaybackStatus").onInterface(MP2P).withGetter([&] { return detail::playback_status_to_string(playback_status); });
+    object->registerProperty("LoopStatus")    .onInterface(MP2P).withGetter([&] { return detail::loop_status_to_string(loop_status); })
+                                                                .withSetter(M(set_loop_status_external));
+    object->registerProperty("Rate")          .onInterface(MP2P).withGetter([&] { return rate; })
+                                                                .withSetter(M(set_rate_external));
+    object->registerProperty("Shuffle")       .onInterface(MP2P).withGetter([&] { return shuffle; })
+                                                                .withSetter(M(set_shuffle_external));
+    object->registerProperty("Metadata")      .onInterface(MP2P).withGetter([&] { return metadata; });
+    object->registerProperty("Volume")        .onInterface(MP2P).withGetter([&] { return volume; })
+                                                                .withSetter(M(set_volume_external));
+    object->registerProperty("Position")      .onInterface(MP2P).withGetter([&] { return position; });
+    object->registerProperty("MinimumRate")   .onInterface(MP2P).withGetter([&] { return minimum_rate; });
+    object->registerProperty("MaximumRate")   .onInterface(MP2P).withGetter([&] { return maximum_rate; });
+    object->registerProperty("CanGoNext")     .onInterface(MP2P).withGetter(M(can_go_next));
+    object->registerProperty("CanGoPrevious") .onInterface(MP2P).withGetter(M(can_go_previous));
+    object->registerProperty("CanPlay")       .onInterface(MP2P).withGetter(M(can_play));
+    object->registerProperty("CanPause")      .onInterface(MP2P).withGetter(M(can_pause));
+    object->registerProperty("CanSeek")       .onInterface(MP2P).withGetter(M(can_seek));
+    object->registerProperty("CanControl")    .onInterface(MP2P).withGetter(M(can_control));
 #undef M
 
-    object->registerSignal("Seeked").onInterface(MP2PLAYER).withParameters<int64_t>("Position");
+    object->registerSignal("Seeked").onInterface(MP2P).withParameters<int64_t>("Position");
 
     object->finishRegistration();
 }
@@ -270,12 +296,7 @@ void Server::set_volume_external(double value)
 
 void Server::send_seeked_signal(int64_t position)
 {
-    object->emitSignal("Seeked").onInterface(MP2PLAYER).withArguments(position);
-}
-
-void Server::prop_changed(const std::string &prop)
-{
-    object->emitPropertiesChangedSignal(MP2, std::vector<std::string>{ prop });
+    object->emitSignal("Seeked").onInterface(MP2P).withArguments(position);
 }
 
 } // namespace mpris
