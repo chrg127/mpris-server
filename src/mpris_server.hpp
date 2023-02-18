@@ -146,9 +146,9 @@ class Server {
     void open_uri(const std::string &uri);
 
 public:
-    static std::optional<Server> make(const std::string &name);
+    static std::unique_ptr<Server> make(const std::string &name);
 
-    Server(const std::string &player_name);
+    explicit Server(const std::string &player_name);
     void start_loop();
     void start_loop_async();
 
@@ -313,13 +313,13 @@ void Server::open_uri(const std::string &uri)
         open_uri_fn(uri);
 }
 
-std::optional<Server> Server::make(const std::string &name)
+std::unique_ptr<Server> Server::make(const std::string &name)
 {
     try {
-        auto s = Server(name);
+        auto s = std::make_unique<Server>(name);
         return s;
     } catch (const sdbus::Error &error) {
-        return std::nullopt;
+        return nullptr;
     }
 }
 

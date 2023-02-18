@@ -15,9 +15,8 @@ int main()
         return 1;
     }
 
-    auto &server = opt.value();
+    auto &server = *opt;
 
-    // auto server = mpris::Server::make("genericplayer");
     server.set_identity("A generic player");
     server.set_supported_uri_schemes({ "file" });
     server.set_supported_mime_types({ "application/octet-stream", "text/plain" });
