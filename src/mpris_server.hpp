@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <functional>
 #include <map>
+#include <optional>
 #include <string>
 #include <variant>
 #include <vector>
@@ -60,32 +61,32 @@ std::function<R(Args...)> member_fn(T *obj, R (T::*fn)(Args...) const)
 
 std::string playback_status_to_string(PlaybackStatus status) { return playback_status_strings[static_cast<int>(status)]; }
 std::string loop_status_to_string(        LoopStatus status) { return     loop_status_strings[static_cast<int>(status)]; }
+std::string field_to_string(Field entry)                     { return metadata_strings[static_cast<int>( entry)]; }
 
 } // namespace detail
 
-std::string metadata_entry_to_string(Field entry) { return metadata_strings[static_cast<int>( entry)]; }
 
 class Server {
-    std::string name;
+    std::string service_name;
     std::unique_ptr<sdbus::IConnection> connection;
     std::unique_ptr<sdbus::IObject> object;
 
-    std::function<void(void)>                       quit_fn;
-    std::function<void(void)>                       raise_fn;
-    std::function<void(void)>                       next_fn;
-    std::function<void(void)>                       previous_fn;
-    std::function<void(void)>                       pause_fn;
-    std::function<void(void)>                       play_pause_fn;
-    std::function<void(void)>                       stop_fn;
-    std::function<void(void)>                       play_fn;
-    std::function<void(int64_t)>                    seek_fn;
-    std::function<void(sdbus::ObjectPath, int64_t)> set_position_fn;
-    std::function<void(std::string)>                open_uri_fn;
-    std::function<void(bool)>                       fullscreen_changed_fn;
-    std::function<void(LoopStatus)>                 loop_status_changed_fn;
-    std::function<void(double)>                     rate_changed_fn;
-    std::function<void(bool)>                       shuffle_changed_fn;
-    std::function<void(double)>                     volume_changed_fn;
+    std::function<void(void)>        quit_fn;
+    std::function<void(void)>        raise_fn;
+    std::function<void(void)>        next_fn;
+    std::function<void(void)>        previous_fn;
+    std::function<void(void)>        pause_fn;
+    std::function<void(void)>        play_pause_fn;
+    std::function<void(void)>        stop_fn;
+    std::function<void(void)>        play_fn;
+    std::function<void(int64_t)>     seek_fn;
+    std::function<void(int64_t)>     set_position_fn;
+    std::function<void(std::string)> open_uri_fn;
+    std::function<void(bool)>        fullscreen_changed_fn;
+    std::function<void(LoopStatus)>  loop_status_changed_fn;
+    std::function<void(double)>      rate_changed_fn;
+    std::function<void(bool)>        shuffle_changed_fn;
+    std::function<void(double)>      volume_changed_fn;
 
     bool fullscreen                  = false;
     std::string identity             = "";
@@ -94,16 +95,16 @@ class Server {
     StringList supported_mime_types  = {};
     PlaybackStatus playback_status   = PlaybackStatus::Stopped;
     LoopStatus loop_status           = LoopStatus::None;
-    double rate                      = 0.0;
+    double rate                      = 1.0;
     bool shuffle                     = false;
     Metadata metadata                = {};
     double volume                    = 0.0;
     int64_t position                 = 0;
-    double maximum_rate              = 0.0;
-    double minimum_rate              = 0.0;
+    double maximum_rate              = 1.0;
+    double minimum_rate              = 1.0;
 
     void prop_changed(const std::string &interface, const std::string &name, sdbus::Variant value);
-    void control_props_changed();
+    void control_props_changed(auto&&... args);
 
     bool can_control()     const { return bool(loop_status_changed_fn) && bool(shuffle_changed_fn)
                                        && bool(volume_changed_fn)      && bool(stop_fn);                }
@@ -111,57 +112,91 @@ class Server {
     bool can_go_previous() const { return can_control() && bool(previous_fn);                           }
     bool can_play()        const { return can_control() && bool(play_fn)      && bool(play_pause_fn);   }
     bool can_pause()       const { return can_control() && bool(pause_fn)     && bool(play_pause_fn);   }
-    bool can_seek()        const { return can_control() && bool(seek_fn);                               }
+    bool can_seek()        const { return can_control() && bool(seek_fn)      && bool(set_position_fn); }
 
     void set_fullscreen_external(bool value);
     void set_loop_status_external(std::string value);
     void set_rate_external(double value);
     void set_shuffle_external(bool value);
     void set_volume_external(double value);
+    void set_position_method(sdbus::ObjectPath id, int64_t pos);
+    void open_uri(const std::string &uri);
 
 public:
-    static Server make(const std::string &name);
+    static std::optional<Server> make(const std::string &name);
 
     Server(const std::string &player_name);
     void start_loop();
     void start_loop_async();
 
-    void on_quit                ( auto &&fn) { quit_fn                = fn; prop_changed(MP2, "CanQuit", true);          }
-    void on_raise               ( auto &&fn) { raise_fn               = fn; prop_changed(MP2, "CanQuit", true);          }
-    void on_next                ( auto &&fn) { next_fn                = fn; control_props_changed();                     }
-    void on_previous            ( auto &&fn) { previous_fn            = fn; control_props_changed();                     }
-    void on_pause               ( auto &&fn) { pause_fn               = fn; control_props_changed();                     }
-    void on_play_pause          ( auto &&fn) { play_pause_fn          = fn; control_props_changed();                     }
-    void on_stop                ( auto &&fn) { stop_fn                = fn; control_props_changed();                     }
-    void on_play                ( auto &&fn) { play_fn                = fn; control_props_changed();                     }
-    void on_seek                ( auto &&fn) { seek_fn                = fn; control_props_changed();                     }
-    void on_set_position        ( auto &&fn) { set_position_fn        = fn;                                              }
-    void on_open_uri            ( auto &&fn) { open_uri_fn            = fn;                                              }
-    void on_fullscreen_changed  ( auto &&fn) { fullscreen_changed_fn  = fn; prop_changed(MP2, "CanSetFullscreen", true); }
-    void on_loop_status_changed ( auto &&fn) { loop_status_changed_fn = fn; control_props_changed();                     }
-    void on_rate_changed        ( auto &&fn) { rate_changed_fn        = fn;                                              }
-    void on_shuffle_changed     ( auto &&fn) { shuffle_changed_fn     = fn; control_props_changed();                     }
-    void on_volume_changed      ( auto &&fn) { volume_changed_fn      = fn; control_props_changed();                     }
+    void on_quit                ( auto &&fn) { quit_fn                = fn; prop_changed(MP2, "CanQuit", true);                                                    }
+    void on_raise               ( auto &&fn) { raise_fn               = fn; prop_changed(MP2, "CanQuit", true);                                                    }
+    void on_next                ( auto &&fn) { next_fn                = fn; control_props_changed("CanGoNext");                                                    }
+    void on_previous            ( auto &&fn) { previous_fn            = fn; control_props_changed("CanGoPrevious");                                                }
+    void on_pause               ( auto &&fn) { pause_fn               = fn; control_props_changed("CanPause");                                                     }
+    void on_play_pause          ( auto &&fn) { play_pause_fn          = fn; control_props_changed("CanPlay", "CanPause");                                          }
+    void on_stop                ( auto &&fn) { stop_fn                = fn; control_props_changed("CanGoNext", "CanGoPrevious", "CanPause", "CanPlay", "CanSeek"); }
+    void on_play                ( auto &&fn) { play_fn                = fn; control_props_changed("CanPlay");                                                      }
+    void on_seek                ( auto &&fn) { seek_fn                = fn; control_props_changed("CanSeek");                                                      }
+    void on_set_position        ( auto &&fn) { set_position_fn        = fn; control_props_changed("CanSeek");                                                      }
+    void on_open_uri            ( auto &&fn) { open_uri_fn            = fn;                                                                                        }
+    void on_fullscreen_changed  ( auto &&fn) { fullscreen_changed_fn  = fn; prop_changed(MP2, "CanSetFullscreen", true);                                           }
+    void on_loop_status_changed ( auto &&fn) { loop_status_changed_fn = fn; control_props_changed("CanGoNext", "CanGoPrevious", "CanPause", "CanPlay", "CanSeek"); }
+    void on_rate_changed        ( auto &&fn) { rate_changed_fn        = fn;                                                                                        }
+    void on_shuffle_changed     ( auto &&fn) { shuffle_changed_fn     = fn; control_props_changed("CanGoNext", "CanGoPrevious", "CanPause", "CanPlay", "CanSeek"); }
+    void on_volume_changed      ( auto &&fn) { volume_changed_fn      = fn; control_props_changed("CanGoNext", "CanGoPrevious", "CanPause", "CanPlay", "CanSeek"); }
 
-    void set_fullscreen(bool value)                         { fullscreen            = value; prop_changed(MP2,  "Fullscreen"          , fullscreen); }
-    void set_identity(const std::string &value)             { identity              = value; prop_changed(MP2,  "Identity"            , identity); }
-    void set_desktop_entry(const std::string &value)        { desktop_entry         = value; prop_changed(MP2,  "DesktopEntry"        , desktop_entry); }
-    void set_supported_uri_schemes(const StringList &value) { supported_uri_schemes = value; prop_changed(MP2,  "SupportedUriSchemes" , supported_uri_schemes ); }
-    void set_supported_mime_types(const StringList &value)  { supported_mime_types  = value; prop_changed(MP2,  "SupportedMimeTypes"  , supported_mime_types); }
+    void set_fullscreen(bool value)                         { fullscreen            = value; prop_changed(MP2,  "Fullscreen"          , fullscreen);                                         }
+    void set_identity(const std::string &value)             { identity              = value; prop_changed(MP2,  "Identity"            , identity);                                           }
+    void set_desktop_entry(const std::string &value)        { desktop_entry         = value; prop_changed(MP2,  "DesktopEntry"        , desktop_entry);                                      }
+    void set_supported_uri_schemes(const StringList &value) { supported_uri_schemes = value; prop_changed(MP2,  "SupportedUriSchemes" , supported_uri_schemes );                             }
+    void set_supported_mime_types(const StringList &value)  { supported_mime_types  = value; prop_changed(MP2,  "SupportedMimeTypes"  , supported_mime_types);                               }
     void set_playback_status(PlaybackStatus value)          { playback_status       = value; prop_changed(MP2P, "PlaybackStatus"      , detail::playback_status_to_string(playback_status)); }
-    void set_loop_status(LoopStatus value)                  { loop_status           = value; prop_changed(MP2P, "LoopStatus"          , detail::loop_status_to_string(loop_status)); }
-    void set_rate(double value)                             { rate                  = value; prop_changed(MP2P, "Rate"                , rate); }
-    void set_shuffle(bool value)                            { shuffle               = value; prop_changed(MP2P, "Shuffle"             , shuffle); }
-    void set_volume(double value)                           { volume                = value; prop_changed(MP2P, "Volume"              , volume); }
-    void set_position(int64_t value)                        { position              = value; }
-    void set_minimum_rate(double value)                     { minimum_rate          = value; prop_changed(MP2P, "MinimumRate"         , minimum_rate); }
-    void set_maximum_rate(double value)                     { maximum_rate          = value; prop_changed(MP2P, "MaximumRate"         , maximum_rate); }
+    void set_loop_status(LoopStatus value)                  { loop_status           = value; prop_changed(MP2P, "LoopStatus"          , detail::loop_status_to_string(loop_status));         }
+    void set_shuffle(bool value)                            { shuffle               = value; prop_changed(MP2P, "Shuffle"             , shuffle);                                            }
+    void set_volume(double value)                           { volume                = value; prop_changed(MP2P, "Volume"              , volume);                                             }
+    void set_position(int64_t value)                        { position              = value;                                                                                                 }
+
+    void set_rate(double value)
+    {
+        if (value == 0.0) {
+            fprintf(stderr, "warning: rate value must not be 0.0.\n");
+            return;
+        }
+        if (value < minimum_rate || value > maximum_rate) {
+            fprintf(stderr, "warning: rate value not in range.\n");
+            return;
+        }
+        rate = value;
+        prop_changed(MP2P, "Rate", rate);
+    }
+
     void set_metadata(const std::map<Field, sdbus::Variant> &value)
     {
         metadata.clear();
         for (auto [k, v] : value)
-            metadata[metadata_entry_to_string(k)] = v;
+            metadata[detail::field_to_string(k)] = v;
         prop_changed(MP2P, "Metadata", metadata);
+    }
+
+    void set_minimum_rate(double value)
+    {
+        if (value > 1.0) {
+            fprintf(stderr, "warning: minimum value should always be 1.0 or lower\n");
+            return;
+        }
+        minimum_rate = value;
+        prop_changed(MP2P, "MinimumRate", minimum_rate);
+    }
+
+    void set_maximum_rate(double value)
+    {
+        if (value < 1.0) {
+            fprintf(stderr, "warning: maximum rate should always be 1.0 or higher\n");
+            return;
+        }
+        maximum_rate = value;
+        prop_changed(MP2P, "MaximumRate"         , maximum_rate);
     }
 
     void send_seeked_signal(int64_t position);
@@ -174,30 +209,103 @@ void Server::prop_changed(const std::string &interface, const std::string &name,
     object->emitSignal("PropertiesChanged").onInterface("org.freedesktop.DBus.Properties").withArguments(MP2, d, std::vector<std::string>{});
 }
 
-void Server::control_props_changed()
+void Server::control_props_changed(auto&&... args)
 {
+    auto f = [&] (std::string_view name) {
+        if (name == "CanGoNext")     return can_go_next();
+        if (name == "CanGoPrevious") return can_go_previous();
+        if (name == "CanPause")      return can_pause();
+        if (name == "CanPlay")       return can_play();
+        if (name == "CanSeek")       return can_seek();
+        return false;
+    };
     std::map<std::string, sdbus::Variant> d;
-    if (can_go_next())     d["CanGoNext"]     = true;
-    if (can_go_previous()) d["CanGoPrevious"] = true;
-    if (can_play())        d["CanPlay"]       = true;
-    if (can_pause())       d["CanPause"]      = true;
-    if (can_seek())        d["CanSeek"]       = true;
-    object->emitSignal("PropertiesChanged").onInterface("org.freedesktop.DBus.Properties").withArguments(MP2, d, std::vector<std::string>{});
+    auto g = [&] (const std::string &v) { if (f(v)) d[v] = true; };
+    (g(args), ...);
+    object->emitSignal("PropertiesChanged").onInterface("org.freedesktop.DBus.Properties").withArguments(MP2P, d, std::vector<std::string>{});
 }
 
-Server Server::make(const std::string &name)
+void Server::set_fullscreen_external(bool value)
 {
-    auto server = Server(name);
-    return server;
+    if (fullscreen_changed_fn)
+        throw sdbus::Error(service_name + ".Error", "Cannot set Fullscreen (CanSetFullscreen is false).");
+    set_fullscreen(value);
+    fullscreen_changed_fn(fullscreen);
+}
+
+void Server::set_loop_status_external(std::string value)
+{
+    for (auto i = 0u; i < std::size(loop_status_strings); i++) {
+        if (value == loop_status_strings[i]) {
+            if (!can_control())
+                throw sdbus::Error(service_name + ".Error", "Cannot set loop status (CanControl is false).");
+            set_loop_status(static_cast<LoopStatus>(i));
+            loop_status_changed_fn(loop_status);
+        }
+    }
+}
+
+void Server::set_rate_external(double value)
+{
+    if (value <= minimum_rate || value > maximum_rate)
+        throw sdbus::Error(service_name + ".Error", "Rate value not in range.");
+    if (value == 0.0)
+        throw sdbus::Error(service_name + ".Error", "Rate value must not be 0.0.");
+    set_rate(value);
+    if (rate_changed_fn)
+        rate_changed_fn(rate);
+}
+
+void Server::set_shuffle_external(bool value)
+{
+    if (!can_control())
+        throw sdbus::Error(service_name + ".Error", "Cannot set shuffle (CanControl is false).");
+    set_shuffle(value);
+    shuffle_changed_fn(shuffle);
+}
+
+void Server::set_volume_external(double value)
+{
+    if (!can_control())
+        throw sdbus::Error(service_name + ".Error", "Cannot set volume (CanControl is false).");
+    set_volume(value);
+    volume_changed_fn(volume);
+}
+
+void Server::set_position_method(sdbus::ObjectPath id, int64_t pos)
+{
+    if (!can_seek())
+        return;
+    auto tid = metadata.find(detail::field_to_string(Field::TrackId));
+    if (tid == metadata.end() || tid->second.get<std::string>() != id)
+        return;
+    set_position_fn(pos);
+}
+
+void Server::open_uri(const std::string &uri)
+{
+    if (open_uri_fn)
+        open_uri_fn(uri);
+}
+
+std::optional<Server> Server::make(const std::string &name)
+{
+    try {
+        auto s = Server(name);
+        return std::move(s);
+    } catch (const sdbus::Error &error) {
+        return std::nullopt;
+    }
 }
 
 Server::Server(const std::string &player_name)
-    : name(player_name)
+    : service_name(PREFIX + player_name)
 {
     connection = sdbus::createSessionBusConnection();
-    connection->requestName(PREFIX + player_name);
+    connection->requestName(service_name);
     object = sdbus::createObject(*connection, OBJECT_PATH);
 
+#define M(f) detail::member_fn(this, &Server::f)
     object->registerMethod("Raise")      .onInterface(MP2) .implementedAs([&] { if (raise_fn)                  raise_fn();      });
     object->registerMethod("Quit")       .onInterface(MP2) .implementedAs([&] { if (quit_fn)                   quit_fn();       });
     object->registerMethod("Next")       .onInterface(MP2P).implementedAs([&] { if (can_go_next())             next_fn();       });
@@ -206,11 +314,10 @@ Server::Server(const std::string &player_name)
     object->registerMethod("PlayPause")  .onInterface(MP2P).implementedAs([&] { if (can_play() || can_pause()) play_pause_fn(); });
     object->registerMethod("Stop")       .onInterface(MP2P).implementedAs([&] { if (can_control())             stop_fn();       });
     object->registerMethod("Play")       .onInterface(MP2P).implementedAs([&] { if (can_play())                play_fn();       });
-    object->registerMethod("Seek")       .onInterface(MP2P).implementedAs([&] (int64_t n)                         { if (can_seek()) seek_fn(n); })              .withInputParamNames("Offset");
-    object->registerMethod("SetPosition").onInterface(MP2P).implementedAs([&] (sdbus::ObjectPath id, int64_t pos) { if (can_seek()) set_position_fn(id, pos); }).withInputParamNames("TrackId", "Position");
-    object->registerMethod("OpenUri")    .onInterface(MP2P).implementedAs([&] (std::string uri)                   { if (open_uri_fn) open_uri_fn(uri); })       .withInputParamNames("Uri");
+    object->registerMethod("Seek")       .onInterface(MP2P).implementedAs([&] (int64_t n) { if (can_seek()) seek_fn(n); }).withInputParamNames("Offset");
+    object->registerMethod("SetPosition").onInterface(MP2P).implementedAs(M(set_position_method))                         .withInputParamNames("TrackId", "Position");
+    object->registerMethod("OpenUri")    .onInterface(MP2P).implementedAs(M(open_uri))                                    .withInputParamNames("Uri");
 
-#define M(f) detail::member_fn(this, &Server::f)
     object->registerProperty("CanQuit")             .onInterface(MP2).withGetter([&] { return bool(quit_fn); });
     object->registerProperty("Fullscreen")          .onInterface(MP2).withGetter([&] { return fullscreen; })
                                                                      .withSetter(M(set_fullscreen_external));
@@ -250,49 +357,6 @@ Server::Server(const std::string &player_name)
 
 void Server::start_loop()       { connection->enterEventLoop(); }
 void Server::start_loop_async() { connection->enterEventLoopAsync(); }
-
-void Server::set_fullscreen_external(bool value)
-{
-    if (fullscreen_changed_fn)
-        throw sdbus::Error(PREFIX + name + ".Error", "Cannot set Fullscreen (CanSetFullscreen is false).");
-    set_fullscreen(value);
-    fullscreen_changed_fn(fullscreen);
-}
-
-void Server::set_loop_status_external(std::string value)
-{
-    for (auto i = 0u; i < std::size(loop_status_strings); i++) {
-        if (value == loop_status_strings[i]) {
-            if (!can_control())
-                throw sdbus::Error(PREFIX + name + ".Error", "Cannot set loop status (CanControl is false).");
-            set_loop_status(static_cast<LoopStatus>(i));
-            loop_status_changed_fn(loop_status);
-        }
-    }
-}
-
-void Server::set_rate_external(double value)
-{
-    set_rate(value);
-    if (rate_changed_fn)
-        rate_changed_fn(rate);
-}
-
-void Server::set_shuffle_external(bool value)
-{
-    if (!can_control())
-        throw sdbus::Error(PREFIX + name + ".Error", "Cannot set shuffle (CanControl is false).");
-    set_shuffle(value);
-    shuffle_changed_fn(shuffle);
-}
-
-void Server::set_volume_external(double value)
-{
-    if (!can_control())
-        throw sdbus::Error(PREFIX + name + ".Error", "Cannot set volume (CanControl is false).");
-    set_volume(value);
-    volume_changed_fn(volume);
-}
 
 void Server::send_seeked_signal(int64_t position)
 {

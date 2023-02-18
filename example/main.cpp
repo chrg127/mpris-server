@@ -3,28 +3,21 @@
 #include <thread>
 #include <unistd.h>
 
-/*
-int main()
-{
-    auto connection = sdbus::createSessionBusConnection("org.mpris.MediaPlayer2.genericplayer");
-    auto obj = sdbus::createObject(*connection, "/org/mpris/MediaPlayer2");
-    obj->registerMethod("Raise").onInterface("org.mpris.MediaPlayer2").implementedAs([] { printf("hi\n"); });
-    obj->finishRegistration();
-    // auto obj2 = sdbus::createObject(*connection, "/org/mpris");
-    // obj2->registerMethod("Get").onInterface("org.freedesktop.DBus.Properties").implementedAs([] (
-    connection->enterEventLoop();
-    return 0;
-}
-*/
-
 int main()
 {
     int i = 0;
     int64_t pos = 0;
     bool playing = false;
 
-    auto server = mpris::Server::make("genericplayer");
+    auto opt = mpris::Server::make("genericplayer");
+    if (!opt) {
+        fprintf(stderr, "can't connect: someone already there.\n");
+        return 1;
+    }
 
+    auto &server = opt.value();
+
+    // auto server = mpris::Server::make("genericplayer");
     server.set_identity("A generic player");
     server.set_supported_uri_schemes({ "file" });
     server.set_supported_mime_types({ "application/octet-stream", "text/plain" });
@@ -58,8 +51,8 @@ int main()
         playing = true;
         server.set_playback_status(mpris::PlaybackStatus::Playing);
     });
-    server.on_seek([&] (int64_t p) { printf("changing pos: %ld\n", pos); pos = p; server.set_position(pos); });
-    server.on_set_position([&] (sdbus::ObjectPath path, int64_t pos) { });
+    server.on_seek(        [&] (int64_t p) { pos += p; server.set_position(pos); });
+    server.on_set_position([&] (int64_t p) { pos  = p; server.set_position(pos); });
     server.on_open_uri([&] (std::string uri) { std::cout << "not opening uri, sorry\n"; });
 
     server.on_loop_status_changed([&] (mpris::LoopStatus status) { });
@@ -68,6 +61,7 @@ int main()
     server.on_volume_changed([&] (double vol) { });
 
     server.start_loop_async();
+
     for (;;) {
         if (playing) {
             printf("%ld\n", pos);
