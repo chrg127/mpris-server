@@ -61,10 +61,9 @@ std::function<R(Args...)> member_fn(T *obj, R (T::*fn)(Args...) const)
 
 std::string playback_status_to_string(PlaybackStatus status) { return playback_status_strings[static_cast<int>(status)]; }
 std::string loop_status_to_string(        LoopStatus status) { return     loop_status_strings[static_cast<int>(status)]; }
-std::string field_to_string(Field entry)                     { return metadata_strings[static_cast<int>( entry)]; }
+std::string field_to_string(                    Field entry) { return        metadata_strings[static_cast<int>( entry)]; }
 
 } // namespace detail
-
 
 class Server {
     std::string service_name;
@@ -292,7 +291,7 @@ std::optional<Server> Server::make(const std::string &name)
 {
     try {
         auto s = Server(name);
-        return std::move(s);
+        return s;
     } catch (const sdbus::Error &error) {
         return std::nullopt;
     }
