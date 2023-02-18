@@ -9,7 +9,31 @@
 #include <string>
 #include <variant>
 #include <vector>
+#include <memory>
+
+#ifdef _WIN32
+#define NO_IMPL
+#endif
+
+#ifndef NO_IMPL
 #include <sdbus-c++/sdbus-c++.h>
+#else
+
+namespace sdbus {
+
+struct Variant {
+    Variant() = default;
+    template <typename T>
+    Variant(const T &) { }
+};
+
+struct ObjectPath { };
+struct IConnection { };
+struct IObject { };
+
+} // namespace sdbus
+
+#endif
 
 namespace mpris {
 
@@ -201,6 +225,8 @@ public:
     void send_seeked_signal(int64_t position);
 };
 
+#ifndef NO_IMPL
+
 void Server::prop_changed(const std::string &interface, const std::string &name, sdbus::Variant value)
 {
     std::map<std::string, sdbus::Variant> d;
@@ -361,6 +387,24 @@ void Server::send_seeked_signal(int64_t position)
 {
     object->emitSignal("Seeked").onInterface(MP2P).withArguments(position);
 }
+
+#else
+
+void Server::prop_changed(const std::string &interface, const std::string &name, sdbus::Variant value) { }
+void Server::control_props_changed(auto&&... args) { }
+void Server::set_fullscreen_external(bool value) { }
+void Server::set_loop_status_external(std::string value) { }
+void Server::set_rate_external(double value) { }
+void Server::set_shuffle_external(bool value) { }
+void Server::set_volume_external(double value) { }
+void Server::set_position_method(sdbus::ObjectPath id, int64_t pos) { }
+void Server::open_uri(const std::string &uri) { }
+std::optional<Server> Server::make(const std::string &name) { return Server(name); }
+Server::Server(const std::string &player_name) { }
+void Server::start_loop() { }
+void Server::start_loop_async() { }
+void Server::send_seeked_signal(int64_t position) { }
+#endif
 
 } // namespace mpris
 
