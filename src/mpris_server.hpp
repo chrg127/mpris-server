@@ -94,22 +94,22 @@ class Server {
     std::unique_ptr<sdbus::IConnection> connection;
     std::unique_ptr<sdbus::IObject> object;
 
-    std::function<void(void)>        quit_fn;
-    std::function<void(void)>        raise_fn;
-    std::function<void(void)>        next_fn;
-    std::function<void(void)>        previous_fn;
-    std::function<void(void)>        pause_fn;
-    std::function<void(void)>        play_pause_fn;
-    std::function<void(void)>        stop_fn;
-    std::function<void(void)>        play_fn;
-    std::function<void(int64_t)>     seek_fn;
-    std::function<void(int64_t)>     set_position_fn;
-    std::function<void(std::string)> open_uri_fn;
-    std::function<void(bool)>        fullscreen_changed_fn;
-    std::function<void(LoopStatus)>  loop_status_changed_fn;
-    std::function<void(double)>      rate_changed_fn;
-    std::function<void(bool)>        shuffle_changed_fn;
-    std::function<void(double)>      volume_changed_fn;
+    std::function<void(void)>               quit_fn;
+    std::function<void(void)>               raise_fn;
+    std::function<void(void)>               next_fn;
+    std::function<void(void)>               previous_fn;
+    std::function<void(void)>               pause_fn;
+    std::function<void(void)>               play_pause_fn;
+    std::function<void(void)>               stop_fn;
+    std::function<void(void)>               play_fn;
+    std::function<void(int64_t)>            seek_fn;
+    std::function<void(int64_t)>            set_position_fn;
+    std::function<void(std::string_view)>   open_uri_fn;
+    std::function<void(bool)>               fullscreen_changed_fn;
+    std::function<void(LoopStatus)>         loop_status_changed_fn;
+    std::function<void(double)>             rate_changed_fn;
+    std::function<void(bool)>               shuffle_changed_fn;
+    std::function<void(double)>             volume_changed_fn;
 
     bool fullscreen                  = false;
     std::string identity             = "";
@@ -138,7 +138,7 @@ class Server {
     bool can_seek()        const { return can_control() && bool(seek_fn)      && bool(set_position_fn); }
 
     void set_fullscreen_external(bool value);
-    void set_loop_status_external(std::string value);
+    void set_loop_status_external(const std::string &value);
     void set_rate_external(double value);
     void set_shuffle_external(bool value);
     void set_volume_external(double value);
@@ -146,9 +146,9 @@ class Server {
     void open_uri(const std::string &uri);
 
 public:
-    static std::unique_ptr<Server> make(const std::string &name);
+    static std::unique_ptr<Server> make(std::string_view name);
 
-    explicit Server(const std::string &player_name);
+    explicit Server(std::string_view player_name);
     void start_loop();
     void start_loop_async();
 
@@ -170,8 +170,8 @@ public:
     void on_volume_changed      ( auto &&fn) { volume_changed_fn      = fn; control_props_changed("CanGoNext", "CanGoPrevious", "CanPause", "CanPlay", "CanSeek"); }
 
     void set_fullscreen(bool value)                         { fullscreen            = value; prop_changed(MP2,  "Fullscreen"          , fullscreen);                                         }
-    void set_identity(const std::string &value)             { identity              = value; prop_changed(MP2,  "Identity"            , identity);                                           }
-    void set_desktop_entry(const std::string &value)        { desktop_entry         = value; prop_changed(MP2,  "DesktopEntry"        , desktop_entry);                                      }
+    void set_identity(std::string_view value)               { identity              = value; prop_changed(MP2,  "Identity"            , identity);                                           }
+    void set_desktop_entry(const std::string_view value)    { desktop_entry         = value; prop_changed(MP2,  "DesktopEntry"        , desktop_entry);                                      }
     void set_supported_uri_schemes(const StringList &value) { supported_uri_schemes = value; prop_changed(MP2,  "SupportedUriSchemes" , supported_uri_schemes );                             }
     void set_supported_mime_types(const StringList &value)  { supported_mime_types  = value; prop_changed(MP2,  "SupportedMimeTypes"  , supported_mime_types);                               }
     void set_playback_status(PlaybackStatus value)          { playback_status       = value; prop_changed(MP2P, "PlaybackStatus"      , detail::playback_status_to_string(playback_status)); }
@@ -231,7 +231,7 @@ void Server::prop_changed(const std::string &interface, const std::string &name,
 {
     std::map<std::string, sdbus::Variant> d;
     d[name] = value;
-    object->emitSignal("PropertiesChanged").onInterface("org.freedesktop.DBus.Properties").withArguments(MP2, d, std::vector<std::string>{});
+    object->emitSignal("PropertiesChanged").onInterface("org.freedesktop.DBus.Properties").withArguments(interface, d, std::vector<std::string>{});
 }
 
 void Server::control_props_changed(auto&&... args)
@@ -258,7 +258,7 @@ void Server::set_fullscreen_external(bool value)
     fullscreen_changed_fn(fullscreen);
 }
 
-void Server::set_loop_status_external(std::string value)
+void Server::set_loop_status_external(const std::string &value)
 {
     for (auto i = 0u; i < std::size(loop_status_strings); i++) {
         if (value == loop_status_strings[i]) {
@@ -313,7 +313,7 @@ void Server::open_uri(const std::string &uri)
         open_uri_fn(uri);
 }
 
-std::unique_ptr<Server> Server::make(const std::string &name)
+std::unique_ptr<Server> Server::make(std::string_view name)
 {
     try {
         auto s = std::make_unique<Server>(name);
@@ -323,8 +323,8 @@ std::unique_ptr<Server> Server::make(const std::string &name)
     }
 }
 
-Server::Server(const std::string &player_name)
-    : service_name(PREFIX + player_name)
+Server::Server(std::string_view name)
+    : service_name(PREFIX + std::string(name))
 {
     connection = sdbus::createSessionBusConnection();
     connection->requestName(service_name);
@@ -393,7 +393,7 @@ void Server::send_seeked_signal(int64_t position)
 void Server::prop_changed(const std::string &interface, const std::string &name, sdbus::Variant value) { }
 void Server::control_props_changed(auto&&... args) { }
 void Server::set_fullscreen_external(bool value) { }
-void Server::set_loop_status_external(std::string value) { }
+void Server::set_loop_status_external(const std::string &value) { }
 void Server::set_rate_external(double value) { }
 void Server::set_shuffle_external(bool value) { }
 void Server::set_volume_external(double value) { }

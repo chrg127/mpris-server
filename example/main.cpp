@@ -1,7 +1,5 @@
 #include "../src/mpris_server.hpp"
-#include <iostream>
-#include <thread>
-#include <unistd.h>
+#include <unistd.h> // sleep()
 
 int main()
 {
@@ -52,7 +50,7 @@ int main()
     });
     server.on_seek(        [&] (int64_t p) { pos += p; server.set_position(pos); });
     server.on_set_position([&] (int64_t p) { pos  = p; server.set_position(pos); });
-    server.on_open_uri([&] (std::string uri) { std::cout << "not opening uri, sorry\n"; });
+    server.on_open_uri([&] (std::string_view uri) { printf("not opening uri, sorry\n"); });
 
     server.on_loop_status_changed([&] (mpris::LoopStatus status) { });
     server.on_rate_changed([&] (double rate) { });
