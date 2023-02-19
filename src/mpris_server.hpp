@@ -1,5 +1,5 @@
-#ifndef MPRISSERVER_HPP_INCLUDED
-#define MPRISSERVER_HPP_INCLUDED
+#ifndef MPRIS_SERVER_HPP_INCLUDED
+#define MPRIS_SERVER_HPP_INCLUDED
 
 #include <cstdio>
 #include <cstdint>
@@ -12,10 +12,10 @@
 #include <memory>
 
 #ifdef _WIN32
-#define NO_IMPL
+#define MPRIS_SERVER_NO_IMPL
 #endif
 
-#ifndef NO_IMPL
+#ifndef MPRIS_SERVER_NO_IMPL
 #include <sdbus-c++/sdbus-c++.h>
 #else
 
@@ -83,9 +83,9 @@ std::function<R(Args...)> member_fn(T *obj, R (T::*fn)(Args...) const)
     return [=](Args&&... args) -> R { return (obj->*fn)(args...); };
 }
 
-std::string playback_status_to_string(PlaybackStatus status) { return playback_status_strings[static_cast<int>(status)]; }
-std::string loop_status_to_string(        LoopStatus status) { return     loop_status_strings[static_cast<int>(status)]; }
-std::string field_to_string(                    Field entry) { return        metadata_strings[static_cast<int>( entry)]; }
+inline std::string playback_status_to_string(PlaybackStatus status) { return playback_status_strings[static_cast<int>(status)]; }
+inline std::string loop_status_to_string(        LoopStatus status) { return     loop_status_strings[static_cast<int>(status)]; }
+inline std::string field_to_string(                    Field entry) { return        metadata_strings[static_cast<int>( entry)]; }
 
 } // namespace detail
 
@@ -171,7 +171,7 @@ public:
 
     void set_fullscreen(bool value)                         { fullscreen            = value; prop_changed(MP2,  "Fullscreen"          , fullscreen);                                         }
     void set_identity(std::string_view value)               { identity              = value; prop_changed(MP2,  "Identity"            , identity);                                           }
-    void set_desktop_entry(const std::string_view value)    { desktop_entry         = value; prop_changed(MP2,  "DesktopEntry"        , desktop_entry);                                      }
+    void set_desktop_entry(std::string_view value)          { desktop_entry         = value; prop_changed(MP2,  "DesktopEntry"        , desktop_entry);                                      }
     void set_supported_uri_schemes(const StringList &value) { supported_uri_schemes = value; prop_changed(MP2,  "SupportedUriSchemes" , supported_uri_schemes );                             }
     void set_supported_mime_types(const StringList &value)  { supported_mime_types  = value; prop_changed(MP2,  "SupportedMimeTypes"  , supported_mime_types);                               }
     void set_playback_status(PlaybackStatus value)          { playback_status       = value; prop_changed(MP2P, "PlaybackStatus"      , detail::playback_status_to_string(playback_status)); }
@@ -225,16 +225,16 @@ public:
     void send_seeked_signal(int64_t position);
 };
 
-#ifndef NO_IMPL
+#ifndef MPRIS_SERVER_NO_IMPL
 
-void Server::prop_changed(const std::string &interface, const std::string &name, sdbus::Variant value)
+inline void Server::prop_changed(const std::string &interface, const std::string &name, sdbus::Variant value)
 {
     std::map<std::string, sdbus::Variant> d;
     d[name] = value;
     object->emitSignal("PropertiesChanged").onInterface("org.freedesktop.DBus.Properties").withArguments(interface, d, std::vector<std::string>{});
 }
 
-void Server::control_props_changed(auto&&... args)
+inline void Server::control_props_changed(auto&&... args)
 {
     auto f = [&] (std::string_view name) {
         if (name == "CanGoNext")     return can_go_next();
@@ -250,7 +250,7 @@ void Server::control_props_changed(auto&&... args)
     object->emitSignal("PropertiesChanged").onInterface("org.freedesktop.DBus.Properties").withArguments(MP2P, d, std::vector<std::string>{});
 }
 
-void Server::set_fullscreen_external(bool value)
+inline void Server::set_fullscreen_external(bool value)
 {
     if (fullscreen_changed_fn)
         throw sdbus::Error(service_name + ".Error", "Cannot set Fullscreen (CanSetFullscreen is false).");
@@ -258,7 +258,7 @@ void Server::set_fullscreen_external(bool value)
     fullscreen_changed_fn(fullscreen);
 }
 
-void Server::set_loop_status_external(const std::string &value)
+inline void Server::set_loop_status_external(const std::string &value)
 {
     for (auto i = 0u; i < std::size(loop_status_strings); i++) {
         if (value == loop_status_strings[i]) {
@@ -270,7 +270,7 @@ void Server::set_loop_status_external(const std::string &value)
     }
 }
 
-void Server::set_rate_external(double value)
+inline void Server::set_rate_external(double value)
 {
     if (value <= minimum_rate || value > maximum_rate)
         throw sdbus::Error(service_name + ".Error", "Rate value not in range.");
@@ -281,7 +281,7 @@ void Server::set_rate_external(double value)
         rate_changed_fn(rate);
 }
 
-void Server::set_shuffle_external(bool value)
+inline void Server::set_shuffle_external(bool value)
 {
     if (!can_control())
         throw sdbus::Error(service_name + ".Error", "Cannot set shuffle (CanControl is false).");
@@ -289,7 +289,7 @@ void Server::set_shuffle_external(bool value)
     shuffle_changed_fn(shuffle);
 }
 
-void Server::set_volume_external(double value)
+inline void Server::set_volume_external(double value)
 {
     if (!can_control())
         throw sdbus::Error(service_name + ".Error", "Cannot set volume (CanControl is false).");
@@ -297,7 +297,7 @@ void Server::set_volume_external(double value)
     volume_changed_fn(volume);
 }
 
-void Server::set_position_method(sdbus::ObjectPath id, int64_t pos)
+inline void Server::set_position_method(sdbus::ObjectPath id, int64_t pos)
 {
     if (!can_seek())
         return;
@@ -307,13 +307,13 @@ void Server::set_position_method(sdbus::ObjectPath id, int64_t pos)
     set_position_fn(pos);
 }
 
-void Server::open_uri(const std::string &uri)
+inline void Server::open_uri(const std::string &uri)
 {
     if (open_uri_fn)
         open_uri_fn(uri);
 }
 
-std::unique_ptr<Server> Server::make(std::string_view name)
+inline std::unique_ptr<Server> Server::make(std::string_view name)
 {
     try {
         auto s = std::make_unique<Server>(name);
@@ -323,7 +323,7 @@ std::unique_ptr<Server> Server::make(std::string_view name)
     }
 }
 
-Server::Server(std::string_view name)
+inline Server::Server(std::string_view name)
     : service_name(PREFIX + std::string(name))
 {
     connection = sdbus::createSessionBusConnection();
@@ -380,30 +380,31 @@ Server::Server(std::string_view name)
     object->finishRegistration();
 }
 
-void Server::start_loop()       { connection->enterEventLoop(); }
-void Server::start_loop_async() { connection->enterEventLoopAsync(); }
+inline void Server::start_loop()       { connection->enterEventLoop(); }
+inline void Server::start_loop_async() { connection->enterEventLoopAsync(); }
 
-void Server::send_seeked_signal(int64_t position)
+inline void Server::send_seeked_signal(int64_t position)
 {
     object->emitSignal("Seeked").onInterface(MP2P).withArguments(position);
 }
 
 #else
 
-void Server::prop_changed(const std::string &interface, const std::string &name, sdbus::Variant value) { }
-void Server::control_props_changed(auto&&... args) { }
-void Server::set_fullscreen_external(bool value) { }
-void Server::set_loop_status_external(const std::string &value) { }
-void Server::set_rate_external(double value) { }
-void Server::set_shuffle_external(bool value) { }
-void Server::set_volume_external(double value) { }
-void Server::set_position_method(sdbus::ObjectPath id, int64_t pos) { }
-void Server::open_uri(const std::string &uri) { }
-std::optional<Server> Server::make(const std::string &name) { return Server(name); }
-Server::Server(const std::string &player_name) { }
-void Server::start_loop() { }
-void Server::start_loop_async() { }
-void Server::send_seeked_signal(int64_t position) { }
+inline void Server::prop_changed(const std::string &interface, const std::string &name, sdbus::Variant value) { }
+inline void Server::control_props_changed(auto&&... args) { }
+inline void Server::set_fullscreen_external(bool value) { }
+inline void Server::set_loop_status_external(const std::string &value) { }
+inline void Server::set_rate_external(double value) { }
+inline void Server::set_shuffle_external(bool value) { }
+inline void Server::set_volume_external(double value) { }
+inline void Server::set_position_method(sdbus::ObjectPath id, int64_t pos) { }
+inline void Server::open_uri(const std::string &uri) { }
+inline std::unique_ptr<Server> Server::make(std::string_view name) { return std::make_unique<Server>(name); }
+inline Server::Server(std::string_view name) { }
+inline void Server::start_loop() { }
+inline void Server::start_loop_async() { }
+inline void Server::send_seeked_signal(int64_t position) { }
+
 #endif
 
 } // namespace mpris
