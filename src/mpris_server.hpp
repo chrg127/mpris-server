@@ -1,3 +1,5 @@
+// FIX [2025-04-19] migrated to sdbus-c++ v2 ( https://github.com/Kistler-Group/sdbus-cpp/blob/master/docs/using-sdbus-c++.md#migrating-to-sdbus-c-v2 )
+
 #ifndef MPRIS_SERVER_HPP_INCLUDED
 #define MPRIS_SERVER_HPP_INCLUDED
 
@@ -152,8 +154,8 @@ public:
     void start_loop();
     void start_loop_async();
 
-    void on_quit                ( auto &&fn) { quit_fn                = fn; prop_changed(MP2, "CanQuit", true);                                                    }
-    void on_raise               ( auto &&fn) { raise_fn               = fn; prop_changed(MP2, "CanQuit", true);                                                    }
+    void on_quit                ( auto &&fn) { quit_fn                = fn; prop_changed(MP2, "CanQuit", sdbus::Variant(true));                                    }
+    void on_raise               ( auto &&fn) { raise_fn               = fn; prop_changed(MP2, "CanQuit", sdbus::Variant(true));                                    }
     void on_next                ( auto &&fn) { next_fn                = fn; control_props_changed("CanGoNext");                                                    }
     void on_previous            ( auto &&fn) { previous_fn            = fn; control_props_changed("CanGoPrevious");                                                }
     void on_pause               ( auto &&fn) { pause_fn               = fn; control_props_changed("CanPause");                                                     }
@@ -163,22 +165,22 @@ public:
     void on_seek                ( auto &&fn) { seek_fn                = fn; control_props_changed("CanSeek");                                                      }
     void on_set_position        ( auto &&fn) { set_position_fn        = fn; control_props_changed("CanSeek");                                                      }
     void on_open_uri            ( auto &&fn) { open_uri_fn            = fn;                                                                                        }
-    void on_fullscreen_changed  ( auto &&fn) { fullscreen_changed_fn  = fn; prop_changed(MP2, "CanSetFullscreen", true);                                           }
+    void on_fullscreen_changed  ( auto &&fn) { fullscreen_changed_fn  = fn; prop_changed(MP2, "CanSetFullscreen", sdbus::Variant(true));                           }
     void on_loop_status_changed ( auto &&fn) { loop_status_changed_fn = fn; control_props_changed("CanGoNext", "CanGoPrevious", "CanPause", "CanPlay", "CanSeek"); }
     void on_rate_changed        ( auto &&fn) { rate_changed_fn        = fn;                                                                                        }
     void on_shuffle_changed     ( auto &&fn) { shuffle_changed_fn     = fn; control_props_changed("CanGoNext", "CanGoPrevious", "CanPause", "CanPlay", "CanSeek"); }
     void on_volume_changed      ( auto &&fn) { volume_changed_fn      = fn; control_props_changed("CanGoNext", "CanGoPrevious", "CanPause", "CanPlay", "CanSeek"); }
 
-    void set_fullscreen(bool value)                         { fullscreen            = value; prop_changed(MP2,  "Fullscreen"          , fullscreen);                                         }
-    void set_identity(std::string_view value)               { identity              = value; prop_changed(MP2,  "Identity"            , identity);                                           }
-    void set_desktop_entry(std::string_view value)          { desktop_entry         = value; prop_changed(MP2,  "DesktopEntry"        , desktop_entry);                                      }
-    void set_supported_uri_schemes(const StringList &value) { supported_uri_schemes = value; prop_changed(MP2,  "SupportedUriSchemes" , supported_uri_schemes );                             }
-    void set_supported_mime_types(const StringList &value)  { supported_mime_types  = value; prop_changed(MP2,  "SupportedMimeTypes"  , supported_mime_types);                               }
-    void set_playback_status(PlaybackStatus value)          { playback_status       = value; prop_changed(MP2P, "PlaybackStatus"      , detail::playback_status_to_string(playback_status)); }
-    void set_loop_status(LoopStatus value)                  { loop_status           = value; prop_changed(MP2P, "LoopStatus"          , detail::loop_status_to_string(loop_status));         }
-    void set_shuffle(bool value)                            { shuffle               = value; prop_changed(MP2P, "Shuffle"             , shuffle);                                            }
-    void set_volume(double value)                           { volume                = value; prop_changed(MP2P, "Volume"              , volume);                                             }
-    void set_position(int64_t value)                        { position              = value;                                                                                                 }
+    void set_fullscreen(bool value)                         { fullscreen            = value; prop_changed(MP2,  "Fullscreen"          , sdbus::Variant(fullscreen));                                         }
+    void set_identity(std::string_view value)               { identity              = value; prop_changed(MP2,  "Identity"            , sdbus::Variant(identity));                                           }
+    void set_desktop_entry(std::string_view value)          { desktop_entry         = value; prop_changed(MP2,  "DesktopEntry"        , sdbus::Variant(desktop_entry));                                      }
+    void set_supported_uri_schemes(const StringList &value) { supported_uri_schemes = value; prop_changed(MP2,  "SupportedUriSchemes" , sdbus::Variant(supported_uri_schemes));                              }
+    void set_supported_mime_types(const StringList &value)  { supported_mime_types  = value; prop_changed(MP2,  "SupportedMimeTypes"  , sdbus::Variant(supported_mime_types));                               }
+    void set_playback_status(PlaybackStatus value)          { playback_status       = value; prop_changed(MP2P, "PlaybackStatus"      , sdbus::Variant(detail::playback_status_to_string(playback_status))); }
+    void set_loop_status(LoopStatus value)                  { loop_status           = value; prop_changed(MP2P, "LoopStatus"          , sdbus::Variant(detail::loop_status_to_string(loop_status)));         }
+    void set_shuffle(bool value)                            { shuffle               = value; prop_changed(MP2P, "Shuffle"             , sdbus::Variant(shuffle));                                            }
+    void set_volume(double value)                           { volume                = value; prop_changed(MP2P, "Volume"              , sdbus::Variant(volume));                                             }
+    void set_position(int64_t value)                        { position              = value;                                                                                                                 }
 
     void set_rate(double value)
     {
@@ -191,7 +193,7 @@ public:
             return;
         }
         rate = value;
-        prop_changed(MP2P, "Rate", rate);
+        prop_changed(MP2P, "Rate", sdbus::Variant(rate));
     }
 
     void set_metadata(const std::map<Field, sdbus::Variant> &value)
@@ -199,7 +201,7 @@ public:
         metadata.clear();
         for (auto [k, v] : value)
             metadata[detail::field_to_string(k)] = v;
-        prop_changed(MP2P, "Metadata", metadata);
+        prop_changed(MP2P, "Metadata", sdbus::Variant(metadata));
     }
 
     void set_minimum_rate(double value)
@@ -209,7 +211,7 @@ public:
             return;
         }
         minimum_rate = value;
-        prop_changed(MP2P, "MinimumRate", minimum_rate);
+        prop_changed(MP2P, "MinimumRate", sdbus::Variant(minimum_rate));
     }
 
     void set_maximum_rate(double value)
@@ -219,7 +221,7 @@ public:
             return;
         }
         maximum_rate = value;
-        prop_changed(MP2P, "MaximumRate"         , maximum_rate);
+        prop_changed(MP2P, "MaximumRate", sdbus::Variant(maximum_rate));
     }
 
     void send_seeked_signal(int64_t position);
@@ -245,7 +247,7 @@ inline void Server::control_props_changed(auto&&... args)
         return false;
     };
     std::map<std::string, sdbus::Variant> d;
-    auto g = [&] (const std::string &v) { if (f(v)) d[v] = true; };
+    auto g = [&] (const std::string &v) { if (f(v)) d[v] = sdbus::Variant(true); };
     (g(args), ...);
     object->emitSignal("PropertiesChanged").onInterface("org.freedesktop.DBus.Properties").withArguments(MP2P, d, std::vector<std::string>{});
 }
@@ -253,7 +255,7 @@ inline void Server::control_props_changed(auto&&... args)
 inline void Server::set_fullscreen_external(bool value)
 {
     if (fullscreen_changed_fn)
-        throw sdbus::Error(service_name + ".Error", "Cannot set Fullscreen (CanSetFullscreen is false).");
+        throw sdbus::Error(sdbus::Error::Name{service_name + ".Error"}, "Cannot set Fullscreen (CanSetFullscreen is false).");
     set_fullscreen(value);
     fullscreen_changed_fn(fullscreen);
 }
@@ -263,7 +265,7 @@ inline void Server::set_loop_status_external(const std::string &value)
     for (auto i = 0u; i < std::size(loop_status_strings); i++) {
         if (value == loop_status_strings[i]) {
             if (!can_control())
-                throw sdbus::Error(service_name + ".Error", "Cannot set loop status (CanControl is false).");
+                throw sdbus::Error(sdbus::Error::Name{service_name + ".Error"}, "Cannot set loop status (CanControl is false).");
             set_loop_status(static_cast<LoopStatus>(i));
             loop_status_changed_fn(loop_status);
         }
@@ -273,9 +275,9 @@ inline void Server::set_loop_status_external(const std::string &value)
 inline void Server::set_rate_external(double value)
 {
     if (value <= minimum_rate || value > maximum_rate)
-        throw sdbus::Error(service_name + ".Error", "Rate value not in range.");
+        throw sdbus::Error(sdbus::Error::Name{service_name + ".Error"}, "Rate value not in range.");
     if (value == 0.0)
-        throw sdbus::Error(service_name + ".Error", "Rate value must not be 0.0.");
+        throw sdbus::Error(sdbus::Error::Name{service_name + ".Error"}, "Rate value must not be 0.0.");
     set_rate(value);
     if (rate_changed_fn)
         rate_changed_fn(rate);
@@ -284,7 +286,7 @@ inline void Server::set_rate_external(double value)
 inline void Server::set_shuffle_external(bool value)
 {
     if (!can_control())
-        throw sdbus::Error(service_name + ".Error", "Cannot set shuffle (CanControl is false).");
+        throw sdbus::Error(sdbus::Error::Name{service_name + ".Error"}, "Cannot set shuffle (CanControl is false).");
     set_shuffle(value);
     shuffle_changed_fn(shuffle);
 }
@@ -292,7 +294,7 @@ inline void Server::set_shuffle_external(bool value)
 inline void Server::set_volume_external(double value)
 {
     if (!can_control())
-        throw sdbus::Error(service_name + ".Error", "Cannot set volume (CanControl is false).");
+        throw sdbus::Error(sdbus::Error::Name{service_name + ".Error"}, "Cannot set volume (CanControl is false).");
     set_volume(value);
     volume_changed_fn(volume);
 }
@@ -327,57 +329,53 @@ inline Server::Server(std::string_view name)
     : service_name(PREFIX + std::string(name))
 {
     connection = sdbus::createSessionBusConnection();
-    connection->requestName(service_name);
-    object = sdbus::createObject(*connection, OBJECT_PATH);
+    connection->requestName(sdbus::ServiceName{service_name});
+    object = sdbus::createObject(*connection, sdbus::ObjectPath{OBJECT_PATH});
 
 #define M(f) detail::member_fn(this, &Server::f)
-    object->registerMethod("Raise")      .onInterface(MP2) .implementedAs([&] { if (raise_fn)                  raise_fn();      });
-    object->registerMethod("Quit")       .onInterface(MP2) .implementedAs([&] { if (quit_fn)                   quit_fn();       });
-    object->registerMethod("Next")       .onInterface(MP2P).implementedAs([&] { if (can_go_next())             next_fn();       });
-    object->registerMethod("Previous")   .onInterface(MP2P).implementedAs([&] { if (can_go_previous())         previous_fn();   });
-    object->registerMethod("Pause")      .onInterface(MP2P).implementedAs([&] { if (can_pause())               pause_fn();      });
-    object->registerMethod("PlayPause")  .onInterface(MP2P).implementedAs([&] { if (can_play() || can_pause()) play_pause_fn(); });
-    object->registerMethod("Stop")       .onInterface(MP2P).implementedAs([&] { if (can_control())             stop_fn();       });
-    object->registerMethod("Play")       .onInterface(MP2P).implementedAs([&] { if (can_play())                play_fn();       });
-    object->registerMethod("Seek")       .onInterface(MP2P).implementedAs([&] (int64_t n) { if (can_seek()) seek_fn(n); }).withInputParamNames("Offset");
-    object->registerMethod("SetPosition").onInterface(MP2P).implementedAs(M(set_position_method))                         .withInputParamNames("TrackId", "Position");
-    object->registerMethod("OpenUri")    .onInterface(MP2P).implementedAs(M(open_uri))                                    .withInputParamNames("Uri");
+    object->addVTable(sdbus::registerMethod("Raise").implementedAs([&] { if (raise_fn) raise_fn(); })
+                    , sdbus::registerMethod("Quit") .implementedAs([&] { if (quit_fn)  quit_fn();  })
 
-    object->registerProperty("CanQuit")             .onInterface(MP2).withGetter([&] { return bool(quit_fn); });
-    object->registerProperty("Fullscreen")          .onInterface(MP2).withGetter([&] { return fullscreen; })
-                                                                     .withSetter(M(set_fullscreen_external));
-    object->registerProperty("CanSetFullscreen")    .onInterface(MP2).withGetter([&] { return bool(fullscreen_changed_fn); });
-    object->registerProperty("CanRaise")            .onInterface(MP2).withGetter([&] { return bool(raise_fn); });
-    object->registerProperty("HasTrackList")        .onInterface(MP2).withGetter([&] { return false; });
-    object->registerProperty("Identity")            .onInterface(MP2).withGetter([&] { return identity; });
-    object->registerProperty("DesktopEntry")        .onInterface(MP2).withGetter([&] { return desktop_entry; });
-    object->registerProperty("SupportedUriSchemes") .onInterface(MP2).withGetter([&] { return supported_uri_schemes; });
-    object->registerProperty("SupportedMimeTypes")  .onInterface(MP2).withGetter([&] { return supported_mime_types; });
+                    , sdbus::registerProperty("CanQuit")            .withGetter([&] { return bool(quit_fn); })
+                    , sdbus::registerProperty("Fullscreen")         .withGetter([&] { return fullscreen; }).withSetter(M(set_fullscreen_external))
+                    , sdbus::registerProperty("CanSetFullscreen")   .withGetter([&] { return bool(fullscreen_changed_fn); })
+                    , sdbus::registerProperty("CanRaise")           .withGetter([&] { return bool(raise_fn); })
+                    , sdbus::registerProperty("HasTrackList")       .withGetter([&] { return false; })
+                    , sdbus::registerProperty("Identity")           .withGetter([&] { return identity; })
+                    , sdbus::registerProperty("DesktopEntry")       .withGetter([&] { return desktop_entry; })
+                    , sdbus::registerProperty("SupportedUriSchemes").withGetter([&] { return supported_uri_schemes; })
+                    , sdbus::registerProperty("SupportedMimeTypes") .withGetter([&] { return supported_mime_types; })
+                    ).forInterface(MP2);
 
-    object->registerProperty("PlaybackStatus").onInterface(MP2P).withGetter([&] { return detail::playback_status_to_string(playback_status); });
-    object->registerProperty("LoopStatus")    .onInterface(MP2P).withGetter([&] { return detail::loop_status_to_string(loop_status); })
-                                                                .withSetter(M(set_loop_status_external));
-    object->registerProperty("Rate")          .onInterface(MP2P).withGetter([&] { return rate; })
-                                                                .withSetter(M(set_rate_external));
-    object->registerProperty("Shuffle")       .onInterface(MP2P).withGetter([&] { return shuffle; })
-                                                                .withSetter(M(set_shuffle_external));
-    object->registerProperty("Metadata")      .onInterface(MP2P).withGetter([&] { return metadata; });
-    object->registerProperty("Volume")        .onInterface(MP2P).withGetter([&] { return volume; })
-                                                                .withSetter(M(set_volume_external));
-    object->registerProperty("Position")      .onInterface(MP2P).withGetter([&] { return position; });
-    object->registerProperty("MinimumRate")   .onInterface(MP2P).withGetter([&] { return minimum_rate; });
-    object->registerProperty("MaximumRate")   .onInterface(MP2P).withGetter([&] { return maximum_rate; });
-    object->registerProperty("CanGoNext")     .onInterface(MP2P).withGetter(M(can_go_next));
-    object->registerProperty("CanGoPrevious") .onInterface(MP2P).withGetter(M(can_go_previous));
-    object->registerProperty("CanPlay")       .onInterface(MP2P).withGetter(M(can_play));
-    object->registerProperty("CanPause")      .onInterface(MP2P).withGetter(M(can_pause));
-    object->registerProperty("CanSeek")       .onInterface(MP2P).withGetter(M(can_seek));
-    object->registerProperty("CanControl")    .onInterface(MP2P).withGetter(M(can_control));
+    object->addVTable(sdbus::registerMethod("Next")       .implementedAs([&] { if (can_go_next())             next_fn();       })
+                    , sdbus::registerMethod("Previous")   .implementedAs([&] { if (can_go_previous())         previous_fn();   })
+                    , sdbus::registerMethod("Pause")      .implementedAs([&] { if (can_pause())               pause_fn();      })
+                    , sdbus::registerMethod("PlayPause")  .implementedAs([&] { if (can_play() || can_pause()) play_pause_fn(); })
+                    , sdbus::registerMethod("Stop")       .implementedAs([&] { if (can_control())             stop_fn();       })
+                    , sdbus::registerMethod("Play")       .implementedAs([&] { if (can_play())                play_fn();       })
+                    , sdbus::registerMethod("Seek")       .implementedAs([&] (int64_t n) { if (can_seek()) seek_fn(n); }).withInputParamNames("Offset")
+                    , sdbus::registerMethod("SetPosition").implementedAs(M(set_position_method))                         .withInputParamNames("TrackId", "Position")
+                    , sdbus::registerMethod("OpenUri")    .implementedAs(M(open_uri))                                    .withInputParamNames("Uri")
+
+                    , sdbus::registerProperty("PlaybackStatus").withGetter([&] { return detail::playback_status_to_string(playback_status); })
+                    , sdbus::registerProperty("LoopStatus")    .withGetter([&] { return detail::loop_status_to_string(loop_status); }).withSetter(M(set_loop_status_external))
+                    , sdbus::registerProperty("Rate")          .withGetter([&] { return rate; }).withSetter(M(set_rate_external))
+                    , sdbus::registerProperty("Shuffle")       .withGetter([&] { return shuffle; }).withSetter(M(set_shuffle_external))
+                    , sdbus::registerProperty("Metadata")      .withGetter([&] { return metadata; })
+                    , sdbus::registerProperty("Volume")        .withGetter([&] { return volume; }).withSetter(M(set_volume_external))
+                    , sdbus::registerProperty("Position")      .withGetter([&] { return position; })
+                    , sdbus::registerProperty("MinimumRate")   .withGetter([&] { return minimum_rate; })
+                    , sdbus::registerProperty("MaximumRate")   .withGetter([&] { return maximum_rate; })
+                    , sdbus::registerProperty("CanGoNext")     .withGetter(M(can_go_next))
+                    , sdbus::registerProperty("CanGoPrevious") .withGetter(M(can_go_previous))
+                    , sdbus::registerProperty("CanPlay")       .withGetter(M(can_play))
+                    , sdbus::registerProperty("CanPause")      .withGetter(M(can_pause))
+                    , sdbus::registerProperty("CanSeek")       .withGetter(M(can_seek))
+                    , sdbus::registerProperty("CanControl")    .withGetter(M(can_control))
+
+                    , sdbus::registerSignal("Seeked").withParameters<int64_t>("Position")
+                    ).forInterface(MP2P);
 #undef M
-
-    object->registerSignal("Seeked").onInterface(MP2P).withParameters<int64_t>("Position");
-
-    object->finishRegistration();
 }
 
 inline void Server::start_loop()       { connection->enterEventLoop(); }
