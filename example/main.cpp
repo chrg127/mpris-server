@@ -19,11 +19,11 @@ int main()
     server.set_supported_uri_schemes({ "file" });
     server.set_supported_mime_types({ "application/octet-stream", "text/plain" });
     server.set_metadata({
-        { mpris::Field::TrackId,    "/1"             },
-        { mpris::Field::Album,      "an album"       },
-        { mpris::Field::Title,      "best song ever" },
-        { mpris::Field::Artist,     "idk"            },
-        { mpris::Field::Length,     1000             }
+        { mpris::Field::TrackId, sdbus::Variant("/1"            ) },
+        { mpris::Field::Album,   sdbus::Variant("an album"      ) },
+        { mpris::Field::Title,   sdbus::Variant("best song ever") },
+        { mpris::Field::Artist,  sdbus::Variant("idk"           ) },
+        { mpris::Field::Length,  sdbus::Variant(1000            ) }
     } );
     server.set_maximum_rate(2.0);
     server.set_minimum_rate(0.1);
@@ -58,6 +58,7 @@ int main()
     server.on_volume_changed([&] (double vol) { });
 
     server.start_loop_async();
+    // Call player here, probably with argv[1]
 
     for (;;) {
         if (playing) {
