@@ -12,9 +12,6 @@ will need to install [sdbus-c++](https://github.com/Kistler-Group/sdbus-cpp/) to
 
 First off, you might want to see the [MPRIS specification](https://specifications.freedesktop.org/mpris-spec/latest/index.html).
 
-For usage it is best to see the single example `example/main.cpp`, which
-showcases how easy it is to create a compliant player.
-
 For a brief usage:
 
 * There is only one class, `mpris::Server`. You can create one using
@@ -39,6 +36,14 @@ For a brief usage:
   and it's up to you to implement necessary checks (this was done mostly
   not to have to write URI and MIME implementations too).
 * Finally, you can disable the implementation, leaving only dummy functions,
-  by defining the macro `NO_IMPL`. It is defined automatically on Windows (so
-  that one may be able to use the library on Windows without needing to
-  set-up sdbus-c++).
+  by defining the macro `MPRIS_SERVER_NO_IMPL`. For example, it is a good idea
+  to define it on Windows, where the average user probably won't have dbus
+  installed. This way you don't need to set-up sdbus-c++ on Windows.
+
+## example
+
+There is an example in the `example`, which showcases how to create a compliant
+player. When run, it will create a `org.mpris.MediaPlayer2.genericplayer` object
+on the D-Bus session bus. If you have a D-Bus debugger open, you can send it
+commands from there.
+

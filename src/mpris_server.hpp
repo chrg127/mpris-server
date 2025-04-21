@@ -1,5 +1,3 @@
-// FIX [2025-04-19] migrated to sdbus-c++ v2 ( https://github.com/Kistler-Group/sdbus-cpp/blob/master/docs/using-sdbus-c++.md#migrating-to-sdbus-c-v2 )
-
 #ifndef MPRIS_SERVER_HPP_INCLUDED
 #define MPRIS_SERVER_HPP_INCLUDED
 
@@ -12,10 +10,6 @@
 #include <variant>
 #include <vector>
 #include <memory>
-
-#ifdef _WIN32
-#define MPRIS_SERVER_NO_IMPL
-#endif
 
 #ifndef MPRIS_SERVER_NO_IMPL
 #include <sdbus-c++/sdbus-c++.h>

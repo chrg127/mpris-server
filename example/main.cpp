@@ -58,8 +58,9 @@ int main()
     server.on_volume_changed([&] (double vol) { });
 
     server.start_loop_async();
-    // Call player here, probably with argv[1]
 
+    // ideally, you'd call your music player here
+    // in this example we will simulate one with this simple loop:
     for (;;) {
         if (playing) {
             printf("%ld\n", pos);

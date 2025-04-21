@@ -10,7 +10,7 @@ CC 			:= gcc
 CXX 		:= g++
 CFLAGS 		:= -I./external/include -std=c11 -Wall -Wextra -pedantic -Wno-unused-parameter
 CXXFLAGS 	:= -I./external/include -std=c++20 -Wall -Wextra -pedantic -Wno-unused-parameter
-LDLIBS 		:= $(shell pkg-config --libs sdbus-c++) # -lfmt (place first if wanted)
+LDLIBS 		:= $(shell pkg-config --libs sdbus-c++)
 libs_test 	:=
 PREFIX		:= /usr/local
 DESTDIR		:=
