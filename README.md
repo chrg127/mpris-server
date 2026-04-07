@@ -1,5 +1,7 @@
 # MPRIS Server (mpris_server.hpp)
 
+*Warning*: this repository has been migrated to [codeberg](https://codeberg.org/chrg/gmplayer). You should join codeberg too (or any one of the github alternatives).
+
 mpris_server.hpp is a header only C++ library that implements the MPRIS
 specification on top of the sdbus-c++ library.
 
